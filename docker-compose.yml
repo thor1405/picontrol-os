@@ -4,7 +4,7 @@ services:
   # PiControl OS Core Backend & Embedded Frontend Server
   picontrol-server:
     build:
-      context: ./server
+      context: .
       dockerfile: Dockerfile
     container_name: picontrol-server
     restart: unless-stopped

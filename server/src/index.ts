@@ -53,11 +53,49 @@ app.use('/api/alerts', authMiddleware, alertsRoutes);
 app.use('/api/settings', authMiddleware, settingsRoutes);
 
 // Static client hosting for production deployment
-const staticPath = path.resolve(__dirname, '../../client/dist');
-if (fs.existsSync(staticPath)) {
+const candidatePaths = [
+  path.resolve(__dirname, '../public'),
+  path.resolve(__dirname, 'public'),
+  path.resolve(__dirname, '../../client/dist'),
+  path.resolve(process.cwd(), 'public'),
+  path.resolve(process.cwd(), 'client/dist'),
+  path.resolve(process.cwd(), '../client/dist'),
+];
+
+const staticPath = candidatePaths.find((p) => fs.existsSync(p));
+
+if (staticPath) {
+  console.log(`[Static] Serving frontend from: ${staticPath}`);
   app.use(express.static(staticPath));
   app.get('*', (_req, res) => {
     res.sendFile(path.join(staticPath, 'index.html'));
+  });
+} else {
+  console.warn('[Static] Warning: No frontend build directory found in:', candidatePaths);
+  app.get('*', (_req, res) => {
+    res.status(200).send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <title>PiControl OS — API Ready</title>
+        <style>
+          body { background: #080B12; color: #F8FAFC; font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+          .card { background: #121826; border: 1px solid #263244; padding: 32px; border-radius: 16px; max-width: 480px; text-align: center; }
+          h2 { color: #3B82F6; margin-top: 0; }
+          p { color: #94A3B8; font-size: 14px; line-height: 1.5; }
+          code { background: #192233; color: #06B6D4; padding: 2px 6px; border-radius: 4px; font-family: monospace; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <h2>PiControl OS Backend is Online</h2>
+          <p>The API server is running on port 8090, but the frontend static assets are currently building or not yet placed in <code>public/</code>.</p>
+          <p>API Health: <a href="/api/health" style="color: #10B981;">/api/health</a></p>
+        </div>
+      </body>
+      </html>
+    `);
   });
 }
 

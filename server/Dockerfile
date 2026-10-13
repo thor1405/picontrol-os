@@ -1,16 +1,25 @@
-# Multi-stage ARM64 & x86_64 compatible Dockerfile for PiControl OS Server
-FROM node:22-alpine AS builder
+# ==============================================================================
+# PiControl OS — Production Dockerfile
+# ==============================================================================
 
-WORKDIR /app
+# Build React Frontend
+FROM node:22-alpine AS client-builder
+WORKDIR /client
+COPY ../client/package*.json ../client/tsconfig*.json ../client/vite.config.ts ../client/tailwind.config.js ../client/postcss.config.js ../client/index.html ./
+RUN npm ci
+COPY ../client/src/ ./src/
+RUN npm run build
+
+# Build Server Backend
+FROM node:22-alpine AS server-builder
+WORKDIR /server
 COPY package*.json tsconfig.json ./
 RUN npm ci
-
 COPY src/ ./src/
 RUN npm run build
 
 # Production Runtime
 FROM node:22-alpine AS runner
-
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=8090
@@ -18,9 +27,9 @@ ENV PORT=8090
 COPY package*.json ./
 RUN npm ci --only=production
 
-COPY --from=builder /app/dist ./dist
+COPY --from=server-builder /server/dist ./dist
+COPY --from=client-builder /client/dist ./public
 
-# Persistent data directory
 RUN mkdir -p /app/data
 VOLUME ["/app/data"]
 
