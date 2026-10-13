@@ -1,0 +1,73 @@
+# ==============================================================================
+# PiControl OS — .gitignore
+# ==============================================================================
+
+# Environment variables & secrets (preserve .env.example)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# Dependencies
+node_modules/
+server/node_modules/
+client/node_modules/
+
+# Production build outputs
+dist/
+client/dist/
+server/dist/
+build/
+.tsbuildinfo
+
+# SQLite Database & Runtime Data
+data/
+server/data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Prometheus TSDB data
+prometheus/data/
+picontrol-prom-data/
+
+# Application and debug logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Backups and archives
+backups/
+*.tar.gz
+*.zip
+
+# Operating System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+
+# IDE & Editor settings
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Temporary files
+tmp/
+temp/

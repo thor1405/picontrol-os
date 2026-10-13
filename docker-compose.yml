@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  # PiControl OS Core Backend & Embedded Frontend Server
+  picontrol-server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: picontrol-server
+    restart: unless-stopped
+    ports:
+      - "${PICONTROL_PORT:-8090}:8090"
+    environment:
+      - NODE_ENV=production
+      - PORT=8090
+      - JWT_SECRET=${JWT_SECRET:-picontrol-rpi5-production-secret-token}
+      - PROMETHEUS_URL=http://prometheus:9090
+      - DOCKER_SOCKET=/var/run/docker.sock
+      - DATA_DIR=/app/data
+      - DEFAULT_ADMIN_USER=${DEFAULT_ADMIN_USER:-admin}
+      - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD:-picontrol2026}
+      - ENABLE_DOCKER_CONTROLS=${ENABLE_DOCKER_CONTROLS:-false}
+      - ALLOW_PRIVATE_IP_CHECKS=${ALLOW_PRIVATE_IP_CHECKS:-false}
+    volumes:
+      - picontrol-data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+    depends_on:
+      - prometheus
+      - node-exporter
+    networks:
+      - picontrol-net
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8090/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # Prometheus Time-Series Database
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: picontrol-prometheus
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
+      - picontrol-prom-data:/prometheus
+    networks:
+      - picontrol-net
+
+  # Prometheus Node Exporter with Host Telemetry Collectors
+  node-exporter:
+    image: prom/node-exporter:v1.7.0
+    container_name: picontrol-node-exporter
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9100:9100"
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker/.+|var/lib/containerd/.+)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      - picontrol-net
+
+networks:
+  picontrol-net:
+    name: picontrol-net
+    driver: bridge
+
+volumes:
+  picontrol-data:
+    name: picontrol-data
+  picontrol-prom-data:
+    name: picontrol-prom-data
