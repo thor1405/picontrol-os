@@ -118,6 +118,8 @@ export async function checkWebsiteUptime(site: WebsiteRow): Promise<UptimeCheckR
             const cert = (res.socket as tls.TLSSocket).getPeerCertificate();
             if (cert && cert.valid_to) {
               const expiryDate = new Date(cert.valid_to);
+              const diffMs = expiryDate.getTime() - Date.now();
+              sslExpiryDays = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
               const rawIssuer = cert.issuer?.O || cert.issuer?.CN || 'Unknown CA';
               sslIssuer = Array.isArray(rawIssuer) ? rawIssuer[0] : rawIssuer;
             }

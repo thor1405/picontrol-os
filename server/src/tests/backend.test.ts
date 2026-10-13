@@ -54,3 +54,28 @@ test('System Telemetry returns structured Raspberry Pi metrics with valid memory
   // Storage
   assert.ok(telemetry.storage.mounts.length >= 1, 'At least root filesystem mount must be present');
 });
+
+test('Service Collector returns comprehensive dynamic service states', async () => {
+  const { checkAllServices } = await import('../collectors/serviceCollector');
+  const services = await checkAllServices();
+  assert.ok(Array.isArray(services), 'Services must be an array');
+  assert.ok(services.length >= 6, 'Must monitor at least 6 core server services');
+
+  for (const s of services) {
+    assert.ok(s.id, 'Service ID must be defined');
+    assert.ok(s.name, 'Service name must be defined');
+    assert.ok(['active', 'inactive', 'failed', 'not_installed'].includes(s.status), `Valid status required for ${s.id}`);
+    assert.ok(s.uptimeHours >= 0, `Uptime hours must be >= 0 for ${s.id}`);
+  }
+});
+
+test('Prometheus Client translates PromQL and returns structured time-series', async () => {
+  const { queryPrometheusRange } = await import('../collectors/prometheusClient');
+  const now = Math.floor(Date.now() / 1000);
+  const series = await queryPrometheusRange('node_cpu_utilization', now - 3600, now, 60);
+  assert.ok(Array.isArray(series), 'Series must be an array');
+  assert.ok(series.length > 0, 'Must return at least one time series');
+  assert.ok(series[0].points.length > 0, 'Must have data points');
+  assert.ok(typeof series[0].points[0].value === 'number', 'Point value must be numeric');
+});
+

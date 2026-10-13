@@ -21,11 +21,18 @@ services:
       - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD:-picontrol2026}
       - ENABLE_DOCKER_CONTROLS=${ENABLE_DOCKER_CONTROLS:-false}
       - ALLOW_PRIVATE_IP_CHECKS=${ALLOW_PRIVATE_IP_CHECKS:-false}
+      - HOST_GATEWAY=host.docker.internal
+    pid: "host"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - picontrol-data:/app/data
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
+      - /:/rootfs:ro
+      - /etc/hostname:/host/etc/hostname:ro
+      - /etc/os-release:/host/etc/os-release:ro
     depends_on:
       - prometheus
       - node-exporter
