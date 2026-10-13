@@ -146,23 +146,43 @@ export const DockerContainers: React.FC = () => {
       </div>
 
       {/* Containers Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filtered.map((c) => (
-          <div
-            key={c.id}
-            className="p-5 rounded-xl bg-surface border border-border hover:border-border-light transition-all space-y-4"
+      {isLoading && containers.length === 0 ? (
+        <div className="p-12 rounded-xl bg-surface border border-border text-center space-y-3">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs text-text-secondary">Querying Docker virtualization engine...</p>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="p-12 rounded-xl bg-surface border border-border text-center space-y-3">
+          <Boxes className="w-8 h-8 text-text-muted mx-auto" />
+          <h3 className="text-sm font-semibold text-text-primary">No Containers Found</h3>
+          <p className="text-xs text-text-secondary max-w-sm mx-auto">
+            {search ? 'No containers match your search query.' : 'No active containers found on the host Docker daemon. Click below to refresh.'}
+          </p>
+          <button
+            onClick={fetchContainers}
+            className="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-medium hover:bg-primary-hover"
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold text-sm text-text-primary tracking-tight">{c.name}</h3>
-                  {c.isCasaOs && (
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-primary/20 text-primary border border-primary/30 font-medium">
-                      CasaOS
-                    </span>
-                  )}
-                </div>
-                <p className="text-[11px] text-text-muted font-mono truncate max-w-xs">{c.image}</p>
+            Scan Engine Again
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {filtered.map((c) => (
+            <div
+              key={c.id}
+              className="p-5 rounded-xl bg-surface border border-border hover:border-border-light transition-all space-y-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-sm text-text-primary tracking-tight">{c.name}</h3>
+                    {c.isCasaOs && (
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-primary/20 text-primary border border-primary/30 font-medium">
+                        CasaOS
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-text-muted font-mono truncate max-w-xs">{c.image}</p>
               </div>
               <StatusBadge status={c.state} size="sm" />
             </div>
@@ -222,6 +242,7 @@ export const DockerContainers: React.FC = () => {
           </div>
         ))}
       </div>
+      )}
 
       {/* Confirmation Modal */}
       <ConfirmationModal

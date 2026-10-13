@@ -8,18 +8,18 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: '#080B12',
-        sidebar: '#0D111B',
-        surface: '#121826',
-        'surface-elevated': '#192233',
+        background: 'var(--color-background)',
+        sidebar: 'var(--color-sidebar)',
+        surface: 'var(--color-surface)',
+        'surface-elevated': 'var(--color-surface-elevated)',
         primary: {
-          DEFAULT: '#3B82F6',
-          hover: '#2563EB',
-          light: '#60A5FA',
+          DEFAULT: 'var(--color-primary, #2563EB)',
+          hover: 'var(--color-primary-hover, #1D4ED8)',
+          light: '#3B82F6',
         },
         secondary: {
-          DEFAULT: '#06B6D4',
-          hover: '#0891B2',
+          DEFAULT: '#0284C7',
+          hover: '#0369A1',
         },
         success: {
           DEFAULT: '#10B981',
@@ -33,11 +33,11 @@ export default {
           DEFAULT: '#EF4444',
           bg: 'rgba(239, 68, 68, 0.12)',
         },
-        'text-primary': '#F8FAFC',
-        'text-secondary': '#94A3B8',
-        'text-muted': '#64748B',
-        border: '#263244',
-        'border-light': '#334155',
+        'text-primary': 'var(--color-text-primary)',
+        'text-secondary': 'var(--color-text-secondary)',
+        'text-muted': 'var(--color-text-muted)',
+        border: 'var(--color-border)',
+        'border-light': 'var(--color-border-light)',
       },
       fontFamily: {
         sans: ['Inter', 'Geist', 'system-ui', '-apple-system', 'sans-serif'],

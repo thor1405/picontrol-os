@@ -429,10 +429,11 @@ function readMemInfo() {
   };
 }
 
-// Read storage mounts and check for CasaOS /DATA
+// Read storage mounts with physical disk deduplication
 function readStorageMounts(): { mounts: DiskMountMetrics[]; readSpeed: number; writeSpeed: number } {
   const mounts: DiskMountMetrics[] = [];
-  const checkedPaths = new Set<string>();
+  const seenDevices = new Set<string>();
+  const seenFSDevIds = new Set<number>();
 
   const probePath = (p: string, fsName: string, dev: string) => {
     try {
@@ -444,16 +445,35 @@ function readStorageMounts(): { mounts: DiskMountMetrics[]; readSpeed: number; w
         }
       }
 
-      if (!fs.existsSync(targetPath) || checkedPaths.has(p)) return;
-      checkedPaths.add(p);
+      if (!fs.existsSync(targetPath)) return;
+
+      // Check filesystem device ID to avoid duplicating identical underlying partitions
+      try {
+        const stat = fs.statSync(targetPath);
+        if (stat.dev && seenFSDevIds.has(stat.dev)) {
+          return; // Duplicate mount of the exact same physical filesystem
+        }
+        if (stat.dev) {
+          seenFSDevIds.add(stat.dev);
+        }
+      } catch {}
+
+      if (dev && dev !== '/dev/root' && seenDevices.has(dev)) {
+        return; // Duplicate block device
+      }
+      if (dev && dev.startsWith('/dev/')) {
+        seenDevices.add(dev);
+      }
+
       const stats = fs.statfsSync(targetPath);
       const totalBytes = stats.bsize * stats.blocks;
       const availableBytes = stats.bsize * stats.bavail;
-      const usedBytes = totalBytes - availableBytes;
+      const usedBytes = Math.max(0, totalBytes - availableBytes);
       if (totalBytes <= 0) return;
       const usagePercent = parseFloat(((usedBytes / totalBytes) * 100).toFixed(1));
 
-      const displayPath = p.replace(/^\/rootfs/, '') || '/';
+      let displayPath = p.replace(/^\/rootfs/, '') || '/';
+      if (!displayPath.startsWith('/') && process.platform !== 'win32') displayPath = '/' + displayPath;
 
       mounts.push({
         mountPath: displayPath,
@@ -469,10 +489,17 @@ function readStorageMounts(): { mounts: DiskMountMetrics[]; readSpeed: number; w
     } catch {}
   };
 
-  if (fs.existsSync('/rootfs')) {
-    probePath('/rootfs', 'ext4', '/dev/root');
+  // 1. Probe the physical root filesystem first
+  const rootTarget = fs.existsSync('/rootfs') ? '/rootfs' : (process.platform === 'win32' ? 'C:\\' : '/');
+  probePath(rootTarget, process.platform === 'win32' ? 'NTFS' : 'ext4', '/dev/root');
+
+  // 2. Probe CasaOS /DATA if exists
+  const dataMount = findHostPath('DATA') || findHostPath('data');
+  if (dataMount) {
+    probePath(dataMount, 'ext4', '/dev/sda1');
   }
 
+  // 3. Scan /proc/mounts for other unique physical storage drives (USB drives, NVMe, etc.)
   const mountsFile = findHostPath('proc/mounts');
   if (mountsFile) {
     try {
@@ -484,31 +511,31 @@ function readStorageMounts(): { mounts: DiskMountMetrics[]; readSpeed: number; w
           const dev = parts[0];
           const mount = parts[1];
           const fstype = parts[2];
-          // Filter virtual filesystems
+
+          // Strictly filter only physical storage drives
+          const isPhysicalDev = dev.startsWith('/dev/sd') || dev.startsWith('/dev/nvme') || dev.startsWith('/dev/mmcblk') || dev.startsWith('/dev/mapper');
+          if (!isPhysicalDev) continue;
+
+          // Exclude docker, containerd, snap, boot, and system internal paths
           if (
-            ['proc', 'sysfs', 'devtmpfs', 'tmpfs', 'cgroup', 'overlay', 'squashfs', 'rpc_pipefs', 'tracefs'].includes(fstype) ||
+            mount.includes('/docker') ||
+            mount.includes('/containerd') ||
+            mount.includes('/var/lib/') ||
+            mount.startsWith('/etc') ||
             mount.startsWith('/sys') ||
             mount.startsWith('/proc') ||
-            mount.startsWith('/dev')
+            mount.startsWith('/dev') ||
+            mount.startsWith('/boot') ||
+            mount.startsWith('/run') ||
+            ['overlay', 'tmpfs', 'devtmpfs', 'squashfs'].includes(fstype)
           ) {
             continue;
           }
+
           probePath(mount, fstype, dev);
         }
       }
     } catch {}
-  }
-
-  // Ensure root filesystem is probed
-  if (mounts.length === 0) {
-    const rootPath = findHostPath('rootfs') || (process.platform === 'win32' ? 'C:\\' : '/');
-    probePath(rootPath, process.platform === 'win32' ? 'NTFS' : 'ext4', rootPath);
-  }
-
-  // Probe CasaOS /DATA
-  const dataMount = findHostPath('DATA') || findHostPath('data');
-  if (dataMount && !checkedPaths.has(dataMount)) {
-    probePath(dataMount, 'ext4', '/dev/sda1');
   }
 
   // Calculate disk I/O throughput from /proc/diskstats

@@ -8,6 +8,8 @@ import {
   User,
   Server,
   Cpu,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { useMetrics } from '../../context/MetricsContext';
 import { useAuth } from '../../context/AuthContext';
@@ -18,6 +20,23 @@ export const TopNav: React.FC = () => {
   const { telemetry, isConnected, isPaused, togglePause, lastUpdate } = useMetrics();
   const { user, logout } = useAuth();
   const [timeStr, setTimeStr] = useState<string>('');
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    return localStorage.getItem('picontrol_theme') === 'dark';
+  });
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
+
+  const toggleTheme = () => {
+    const next = !isDarkMode;
+    setIsDarkMode(next);
+    localStorage.setItem('picontrol_theme', next ? 'dark' : 'light');
+  };
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -90,6 +109,19 @@ export const TopNav: React.FC = () => {
           <Clock className="w-3.5 h-3.5 text-text-muted" />
           <span>{timeStr || '00:00:00'}</span>
         </div>
+
+        {/* Theme Toggle (Light / Dark) */}
+        <button
+          onClick={toggleTheme}
+          className="p-1.5 rounded-lg bg-surface hover:bg-surface-elevated border border-border text-text-secondary hover:text-text-primary transition-colors flex items-center gap-1 text-xs"
+          title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+        >
+          {isDarkMode ? (
+            <Sun className="w-4 h-4 text-amber-500" />
+          ) : (
+            <Moon className="w-4 h-4 text-slate-600" />
+          )}
+        </button>
 
         {/* User Menu */}
         <div className="flex items-center gap-2 pl-2 border-l border-border">

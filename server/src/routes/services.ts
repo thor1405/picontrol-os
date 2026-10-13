@@ -8,7 +8,8 @@ router.get('/status', async (_req: Request, res: Response) => {
     const services = await checkAllServices();
     res.json({ services });
   } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Failed to check services' });
+    console.error('[Services] Error checking services:', err);
+    res.json({ services: [] });
   }
 });
 

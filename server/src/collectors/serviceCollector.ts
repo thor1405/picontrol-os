@@ -17,7 +17,7 @@ export interface ServiceStatus {
   lastChecked: string;
 }
 
-function checkTcpPort(port: number, host = '127.0.0.1', timeoutMs = 800): Promise<boolean> {
+function checkTcpPort(port: number, host = '127.0.0.1', timeoutMs = 250): Promise<boolean> {
   return new Promise((resolve) => {
     const socket = new net.Socket();
     socket.setTimeout(timeoutMs);
@@ -43,10 +43,6 @@ function checkTcpPort(port: number, host = '127.0.0.1', timeoutMs = 800): Promis
 let cachedGatewayIp: string | null = null;
 function getHostGatewayIp(): string {
   if (cachedGatewayIp) return cachedGatewayIp;
-  if (process.env.HOST_GATEWAY) {
-    cachedGatewayIp = process.env.HOST_GATEWAY;
-    return cachedGatewayIp;
-  }
 
   const routePath = findHostPath('proc/net/route') || (fs.existsSync('/proc/net/route') ? '/proc/net/route' : null);
   if (routePath) {
@@ -73,17 +69,12 @@ function getHostGatewayIp(): string {
   return cachedGatewayIp;
 }
 
+// Ultra-fast direct IP probe (no DNS lookups that stall on Alpine Linux)
 async function checkServiceTcp(port: number): Promise<boolean> {
-  const hostsToTry = [
-    process.env.HOST_GATEWAY,
-    'host.docker.internal',
-    getHostGatewayIp(),
-    '172.17.0.1',
-    '127.0.0.1',
-  ].filter(Boolean) as string[];
+  const gw = getHostGatewayIp();
+  const hostsToTry = Array.from(new Set([gw, '172.17.0.1', '127.0.0.1']));
 
-  // Probe in parallel for fast response
-  const results = await Promise.all(hostsToTry.map((h) => checkTcpPort(port, h, 600)));
+  const results = await Promise.all(hostsToTry.map((h) => checkTcpPort(port, h, 250)));
   return results.some(Boolean);
 }
 
@@ -122,13 +113,17 @@ function getHostUptimeHours(): number {
       }
     } catch {}
   }
-  return 120;
+  return 25;
 }
 
 function checkSystemdService(serviceName: string): 'active' | 'inactive' | 'failed' | 'not_installed' {
   if (process.platform !== 'linux') return 'not_installed';
+  // Skip if systemctl binary doesn't exist inside container
+  if (!fs.existsSync('/bin/systemctl') && !fs.existsSync('/usr/bin/systemctl')) {
+    return 'not_installed';
+  }
   try {
-    const out = execSync(`systemctl is-active ${serviceName} 2>/dev/null`, { timeout: 1000 }).toString().trim();
+    const out = execSync(`systemctl is-active ${serviceName} 2>/dev/null`, { timeout: 400 }).toString().trim();
     if (out === 'active') return 'active';
     if (out === 'inactive') return 'inactive';
     if (out === 'failed') return 'failed';
@@ -142,18 +137,29 @@ export async function checkAllServices(): Promise<ServiceStatus[]> {
   const timestamp = new Date().toISOString();
   const hostUptime = getHostUptimeHours();
 
-  // 1. Parallel TCP port probes
-  const [sshUp, nginxUp, mongoUp, sambaUp] = await Promise.all([
-    checkServiceTcp(22),
-    checkServiceTcp(80).then(async (up) => up || (await checkServiceTcp(443))),
-    checkServiceTcp(27017),
-    checkServiceTcp(445).then(async (up) => up || (await checkServiceTcp(139))),
-  ]);
+  // 1. Ultra-fast TCP port probes
+  let sshUp = false;
+  let nginxUp = false;
+  let mongoUp = false;
+  let sambaUp = false;
+
+  try {
+    const [s, n, m, sa] = await Promise.all([
+      checkServiceTcp(22),
+      checkServiceTcp(80).then(async (up) => up || (await checkServiceTcp(443))),
+      checkServiceTcp(27017),
+      checkServiceTcp(445).then(async (up) => up || (await checkServiceTcp(139))),
+    ]);
+    sshUp = s;
+    nginxUp = n;
+    mongoUp = m;
+    sambaUp = sa;
+  } catch {}
 
   // 2. Discover running host processes
   const runningProcs = getRunningProcessNames();
 
-  // 3. Discover running Docker containers
+  // 3. Fast container inspection
   let runningContainers: any[] = [];
   try {
     runningContainers = await listContainers();

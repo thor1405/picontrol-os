@@ -14,7 +14,8 @@ router.get('/containers', async (_req: Request, res: Response) => {
     const containers = await listContainers();
     res.json({ containers });
   } catch (error: any) {
-    res.status(500).json({ error: error.message || 'Failed to list containers' });
+    console.error('[Docker] Error listing containers:', error);
+    res.json({ containers: [] });
   }
 });
 
